@@ -1,4 +1,4 @@
-# High-Performance 4x4 Mesh Network-on-Chip (NoC)
+# High-Performance NoC
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Language](https://img.shields.io/badge/language-SystemVerilog-brightgreen.svg)
