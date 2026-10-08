@@ -4,53 +4,65 @@
 ![Language](https://img.shields.io/badge/language-SystemVerilog-brightgreen.svg)
 ![Topology](https://img.shields.io/badge/topology-Mesh-orange.svg)
 
-## 🚀 Overview
+## 📖 What is a Network-on-Chip (NoC)?
 
-This repository features a complete, scalable RTL design of a **4x4 Network-on-Chip (NoC)** based on a mesh topology. The architecture has been written and verified purely in **SystemVerilog**, showcasing a parameterized design capable of efficient data routing across an embedded chip.
+Imagine a bustling city where different neighborhoods (processors, memory, peripherals) need to talk to each other. Instead of building a direct road between every single neighborhood (which would be chaotic and take up too much space), we build a **grid of intersections** (routers). 
 
-It includes an elaborate implementation of fundamental networking concepts on a hardware level, such as X-Y routing algorithms, priority-based switch allocation, and FIFO buffer management. 
+A **Network-on-Chip (NoC)** does exactly this for microchips. It is a highly efficient, scalable network built directly onto a silicon chip that routes data packets between different components, much like cars on a grid of streets. 
+
+## 🚀 Overview of This Project
+
+This project is a complete RTL (Register Transfer Level) design of a **4x4 Mesh NoC** written purely in **SystemVerilog**. It features a 16-node grid (4x4) where each node can seamlessly communicate with any other node using standardized algorithms and hardware buffers.
+
+### The 4x4 Mesh Topology
+
+```mermaid
+graph TD
+    %% Define Nodes
+    N00((Node 0,0)) <--- ---> N01((Node 0,1)) <--- ---> N02((Node 0,2)) <--- ---> N03((Node 0,3))
+    N10((Node 1,0)) <--- ---> N11((Node 1,1)) <--- ---> N12((Node 1,2)) <--- ---> N13((Node 1,3))
+    N20((Node 2,0)) <--- ---> N21((Node 2,1)) <--- ---> N22((Node 2,2)) <--- ---> N23((Node 2,3))
+    N30((Node 3,0)) <--- ---> N31((Node 3,1)) <--- ---> N32((Node 3,2)) <--- ---> N33((Node 3,3))
+
+    %% Vertical connections
+    N00 <--- ---> N10 <--- ---> N20 <--- ---> N30
+    N01 <--- ---> N11 <--- ---> N21 <--- ---> N31
+    N02 <--- ---> N12 <--- ---> N22 <--- ---> N32
+    N03 <--- ---> N13 <--- ---> N23 <--- ---> N33
+```
+*Each node contains a Router that directs traffic North, South, East, West, or Locally.*
+
+## 🏗️ Hardware Architecture
+
+The system is highly modular. If you look inside a single Node, you will find several sub-components working together:
+
+1. **The Router**: The main "intersection" controller. It connects to 5 ports (Local, North, South, East, West).
+2. **Buffer Unit (FIFO)**: When data arrives, it is temporarily stored in these First-In-First-Out queues so packets don't crash into each other.
+3. **Routing Unit**: The "GPS" of the node. It uses the **X-Y Routing Algorithm** to decide which direction a packet should go next based on its final destination.
+4. **Switch Allocator**: The "Traffic Cop". If two packets want to go out the same port at the same time, this resolves the conflict using a strict priority system (`Local` > `West` > `North` > `East` > `South`).
+5. **Switch**: The physical crossbar that connects the input buffers to the chosen output ports.
+
+## 🔌 Communication Interfaces
+
+We use strict interfaces (`interfaces.sv`) to keep the code clean and prevent errors:
+- **`ReqAckIO`**: A handshake protocol (Request/Acknowledge) used between routers to ensure data is safely passed along.
+- **`ReqGntIO`**: A Request/Grant system used internally to talk to the Switch Allocator.
+
+## 🧪 How It Was Tested
+
+Hardware needs to be perfect before it's manufactured. This project uses a **bottom-up testing strategy**:
+1. **Unit Tests**: We first test the small pieces (FIFOs, Buffers) individually.
+2. **Router Test**: We test a single intersection by blasting data into all 5 ports to see how it handles congestion.
+3. **Full System Simulation**: We simulate the entire 4x4 grid. Test Nodes generate random packets, and we use high-level SystemVerilog "mailboxes" to magically track the packets and ensure 100% of them arrive at their correct destinations safely.
 
 ## 📁 Repository Structure
 
 ```text
 ├── src/                # SystemVerilog RTL modules (Router, Buffer, Switch, etc.)
-├── include/            # Common definitions, routing logic, and SystemVerilog interfaces
-├── testbenches/        # Simulation environments for primitive units, single router, and full NoC
-└── README.md           # Project documentation
+├── include/            # Common definitions, routing logic, and interfaces
+├── testbenches/        # Simulation environments for unit tests and the full grid
+└── README.md           # You are here!
 ```
-
-## 🏗️ Hardware Architecture & Modules
-
-The design is highly modular, ensuring ease of scalability and debugging. The core components of the network include:
-
-### 1. Router (`Router.sv`)
-The heart of the NoC. The router connects to five distinct ports: `Local`, `North`, `South`, `East`, and `West`. It acts as a wrapper around the buffer unit, routing unit, and switch allocator.
-
-### 2. Buffer Unit (`Buffer_Unit.sv` & `FIFO.sv`)
-Handles packet reception and storage. It utilizes a First-In-First-Out (FIFO) buffer mechanism and communicates with neighboring modules via a robust `ReqAckIO` (Request-Acknowledge) interface.
-
-### 3. Routing Unit (`Routing_Unit.sv`)
-Implements a combinational **X-Y Routing Algorithm** to compute the next-hop output port based on a packet's destination coordinates.
-
-### 4. Switch Allocator (`Switch_Allocator.sv`)
-Resolves port contention using a strict priority-based arbitration mechanism. The arbitration prioritizes the ports in the following order to resolve conflict efficiently: `Local` > `West` > `North` > `East` > `South`.
-
-### 5. Switch (`Switch.sv`)
-Responsible for physically connecting the requested input channels to the granted output channels based on the allocator's decision.
-
-## 🔌 Communication Interfaces
-
-The system heavily relies on structured SystemVerilog interfaces (`interfaces.sv`) for modularity:
-- **`ReqAckIO`**: Facilitates synchronous Request/Acknowledge handshaking between routers.
-- **`ReqGntIO`**: Manages Request/Grant signals between internal buffers and the Switch Allocator.
-- **`FifoIO`**: Encapsulates read/write operations and status flags for buffer management.
-
-## 🧪 Simulation and Verification
-
-The repository adopts a bottom-up verification strategy:
-- **Primitive Testing**: Individual tests isolate the behavior of `FIFO.sv`, `Buffer_Unit.sv`, and `Routing_Unit.sv`.
-- **Router Testing**: `Router_TB.sv` injects packets into all five ports simultaneously to observe routing functionality and conflict resolution.
-- **System-Level NoC Simulation**: `NOC_TB.sv` uses test `Node.sv` components connected to each of the 16 routers. These nodes randomly generate packets and use high-level SystemVerilog mailboxes as a side-channel reference to ensure no packets are lost or misrouted in transit.
 
 ## 📝 License
 
